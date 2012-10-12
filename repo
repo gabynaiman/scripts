@@ -36,7 +36,7 @@ class Repo < Thor
     puts "\nSummary: #{result.ok} pulled, #{result.pending} pending, #{result.error} errors"
   end
 
-  desc 'push', 'Pull all repositories from gems and applications'
+  desc 'push', 'Push all repositories from gems and applications'
 
   def push
     puts "Pushing repositories"
