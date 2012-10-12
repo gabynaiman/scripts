@@ -1,0 +1,106 @@
+#!/usr/bin/env ruby
+require 'thor'
+require 'git_wrapper'
+require 'open3'
+
+GitWrapper.logger.level = Logger::ERROR
+
+class Result < Struct.new(:ok, :error, :pending)
+end
+
+class Repo < Thor
+
+  desc 'pull', 'Pull all repositories from gems and applications'
+
+  def pull
+    puts "Pulling repositories"
+
+    result = Result.new 0, 0, 0
+
+    repositories.each do |r|
+      name = "#{File.basename(r.location)} "
+      print "  #{name.ljust(30, '-')}> "
+
+      if r.status.any?
+        puts "Pending commit"
+        result.pending += 1
+      elsif r.pull 'origin', r.current_branch
+        puts 'Pulled OK'
+        result.ok += 1
+      else
+        puts "Error: (#{r.log_output.last}#{r.log_error.last})"
+        result.error += 1
+      end
+    end
+
+    puts "\nSummary: #{result.ok} pulled, #{result.pending} pending, #{result.error} errors"
+  end
+
+  desc 'push', 'Pull all repositories from gems and applications'
+
+  def push
+    puts "Pushing repositories"
+
+    result = Result.new 0, 0, 0
+
+    repositories.each do |r|
+      name = "#{File.basename(r.location)} "
+      print "  #{name.ljust(30, '-')}> "
+
+      if r.status.any?
+        puts "Pending commit"
+        result.pending += 1
+      elsif r.push 'origin', r.current_branch
+        puts 'Pushed OK'
+        result.ok += 1
+      else
+        puts "Error: (#{r.log_output.last}#{r.log_error.last})"
+        result.error += 1
+      end
+    end
+
+    puts "\nSummary: #{result.ok} pushed, #{result.pending} pending, #{result.error} errors"
+  end
+
+  desc 'pending', 'List repositories with pending commits'
+
+  def pending
+    puts "Pending changes"
+
+    count = 0
+    repositories.each do |r|
+      if r.status.any?
+        puts "  #{File.basename r.location} (#{r.status.count})"
+        count += 1
+      end
+    end
+
+    puts "\nSummary: #{count} repositories have changes"
+  end
+
+  desc 'gems', 'List gems projects'
+
+  def gems
+    puts 'Listing gems'
+
+    repositories.each do |r|
+      name = File.basename(r.location)
+      if File.exist? "#{r.location}/#{name}.gemspec"
+        version = File.open("#{r.location}/lib/#{name}/version.rb", 'r') {|f| f.readlines[1]}.gsub('VERSION = ', '').gsub("\"", '').gsub("'", '').strip rescue 'UNKNOWN'
+        puts "  #{name.ljust(30, '-')}> v#{version}"
+      end
+    end
+  end
+
+  private
+
+  def repositories
+    gems_path = File.expand_path('../../gems', __FILE__)
+    app_path = File.expand_path('../../applications', __FILE__)
+    sources = [gems_path, app_path].map { |s| Dir.entries(s).map { |e| "#{s}/#{e}" } }.flatten
+    sources.map { |path| GitWrapper::Repository.new(path) }.select { |r| r.initialized? }
+  end
+
+end
+
+Repo.start
