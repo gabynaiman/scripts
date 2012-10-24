@@ -1,0 +1,131 @@
+#!/usr/bin/env ruby
+require 'thor'
+require 'git_wrapper'
+require 'open3'
+
+GitWrapper.logger.level = Logger::ERROR
+
+class VersionInfo
+  attr_accessor :mayor, :minor, :build
+
+  def initialize(version)
+    parts = version.split '.'
+  	@mayor = parts[0].to_i
+  	@minor = parts[1].to_i
+  	@build = parts[2].to_i
+  end
+
+  def increment(part)
+    send("#{part}=", send("#{part}") + 1)
+    self
+  end
+
+  def to_s
+  	"#{mayor}.#{minor}.#{build}"
+  end
+
+end
+
+class Version < Thor
+
+  desc 'last', 'Get last version'
+  def last
+  	return unless valid_repo?
+    puts last_version
+  end
+
+  desc 'build', 'Increment tag and branch build version (0.0.1)'
+  def build
+  	return unless valid_repo?
+    version = last_version.increment :build
+    release version
+  end
+
+  desc 'minor', 'Increment tag and branch minor version (0.1.0)'
+  def minor
+  	return unless valid_repo?
+    version = last_version.increment :minor
+    release version
+  end
+
+  desc 'mayor', 'Increment tag and branch mayor version (1.0.0)'
+  def mayor
+  	return unless valid_repo?
+    version = last_version.increment :mayor
+    release version
+  end
+
+  desc 'release', 'Generate tag and branch for specific version (Branch: 1.2.3, Tag: v1.2.3)'
+  def release(version)
+  	return unless valid_repo?
+
+  	puts "Generating version #{version}"
+    
+    puts '- Creating tag'
+    repo.tag "v#{version}"
+    
+    puts '- Pushing tag'
+    repo.push 'origin', "v#{version}"
+
+    puts '- Creating branch'
+    repo.branch version
+    
+    puts '- Pushing branch'
+    repo.push 'origin', version
+  end
+
+  desc 'remove', 'Remove specific version from git repo'
+  def remove(version)
+    return unless valid_repo?
+
+    puts "Removing version #{version}"
+
+    puts '- Removing local tag'
+    repo.remove_tag "v#{version}"
+
+    puts '- Removing remote tag'
+    repo.push 'origin', ":v#{version}"
+
+    puts '- Removing local branch'
+    repo.remove_branch version
+
+    puts '- Removing remote branch'
+    repo.push 'origin', ":#{version}"
+  end
+
+  desc 'upgrade', 'Checkout last version'
+  def upgrade
+  	change :last
+  end
+
+  desc 'change', 'Checkout specific version'
+  def change(version)
+    return unless valid_repo?
+
+    puts 'Fetching from remote'
+    repo.fetch 'origin'
+    version = version == :last ? last_version.to_s : version
+
+    puts "Changing to #{version}"
+    repo.checkout version
+  end
+
+  private
+
+  def repo
+  	GitWrapper::Repository.new Dir.pwd
+  end
+
+  def valid_repo?
+  	puts "Invalid application path [#{repo.location}]" unless repo.initialized?
+  	repo.initialized?
+  end
+
+  def last_version
+    last_tag = repo.tags.select{|t| t.match /v[0-9]+\.[0-9]+\.[0-9]+/}.sort.reverse.first
+    VersionInfo.new(last_tag ? last_tag[1..-1] : '0.0.0')
+  end
+
+end
+
+Version.start

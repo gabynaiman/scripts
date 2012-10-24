@@ -11,7 +11,6 @@ end
 class Repo < Thor
 
   desc 'pull', 'Pull all repositories from gems and applications'
-
   def pull
     puts "Pulling repositories"
 
@@ -37,7 +36,6 @@ class Repo < Thor
   end
 
   desc 'push', 'Push all repositories from gems and applications'
-
   def push
     puts "Pushing repositories"
 
@@ -63,7 +61,6 @@ class Repo < Thor
   end
 
   desc 'pending', 'List repositories with pending commits'
-
   def pending
     puts "Pending changes"
 
@@ -79,7 +76,6 @@ class Repo < Thor
   end
 
   desc 'gems', 'List gems projects'
-
   def gems
     puts 'Listing gems'
 
