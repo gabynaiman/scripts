@@ -93,7 +93,8 @@ class Repo < Thor
   def repositories
     gems_path = File.expand_path('../../gems', __FILE__)
     app_path = File.expand_path('../../applications', __FILE__)
-    sources = [gems_path, app_path].map { |s| Dir.entries(s).map { |e| "#{s}/#{e}" } }.flatten
+    scripts_path = File.expand_path('../../scripts', __FILE__)
+    sources = [gems_path, app_path].map { |s| Dir.entries(s).map { |e| "#{s}/#{e}" } }.flatten << scripts_path
     sources.map { |path| GitWrapper::Repository.new(path) }.select { |r| r.initialized? }
   end
 
