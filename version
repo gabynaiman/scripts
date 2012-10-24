@@ -20,6 +20,11 @@ class VersionInfo
     self
   end
 
+  def reset(part)
+    send("#{part}=", 0)
+    self
+  end
+
   def to_s
   	"#{mayor}.#{minor}.#{build}"
   end
@@ -37,22 +42,19 @@ class Version < Thor
   desc 'build', 'Increment tag and branch build version (0.0.1)'
   def build
   	return unless valid_repo?
-    version = last_version.increment :build
-    release version
+    release last_version.increment(:build)
   end
 
   desc 'minor', 'Increment tag and branch minor version (0.1.0)'
   def minor
   	return unless valid_repo?
-    version = last_version.increment :minor
-    release version
+    release last_version.increment(:minor).reset(:build)
   end
 
   desc 'mayor', 'Increment tag and branch mayor version (1.0.0)'
   def mayor
   	return unless valid_repo?
-    version = last_version.increment :mayor
-    release version
+    release last_version.increment(:mayor).reset(:minor).reset(:build)
   end
 
   desc 'release', 'Generate tag and branch for specific version (Branch: 1.2.3, Tag: v1.2.3)'
