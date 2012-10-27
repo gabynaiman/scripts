@@ -58,22 +58,25 @@ class Version < Thor
   end
 
   desc 'release', 'Generate tag and branch for specific version (Branch: 1.2.3, Tag: v1.2.3)'
-  def release(version)
+  def release(version=nil)
   	return unless valid_repo?
+	return if !version && !valid_version?
 
   	puts "Generating version #{version}"
     
     puts '- Creating tag'
-    repo.tag "v#{version}"
+    repo.tag "v#{version || repo.current_branch}"
     
     puts '- Pushing tag'
-    repo.push 'origin', "v#{version}"
+    repo.push 'origin', "v#{version || repo.current_branch}"
 
-    puts '- Creating branch'
-    repo.branch version
-    
+    if version
+	  puts '- Creating branch'
+      repo.branch version
+    end
+      
     puts '- Pushing branch'
-    repo.push 'origin', version
+    repo.push 'origin', version || repo.current_branch
   end
 
   desc 'remove', 'Remove specific version from git repo'
@@ -93,6 +96,19 @@ class Version < Thor
 
     puts '- Removing remote branch'
     repo.push 'origin', ":#{version}"
+  end
+  
+  desc 'fix', 'Increment build from current branch'
+  def fix
+    return if !valid_repo? || !valid_version?
+	
+	version = VersionInfo.new(repo.current_branch).increment(:build)
+	  
+	puts "Creating branch #{version}"
+	repo.branch version
+	 
+	puts 'Checkouting'
+	repo.checkout version
   end
 
   desc 'upgrade', 'Checkout last version'
@@ -121,6 +137,14 @@ class Version < Thor
   def valid_repo?
   	puts "Invalid application path [#{repo.location}]" unless repo.initialized?
   	repo.initialized?
+  end
+  
+  def valid_version?
+    unless repo.current_branch.match /[0-9]+\.[0-9]+\.[0-9]+/
+	  puts "Is not branch version [#{repo.current_branch}]"
+	  return false
+	end
+	true
   end
 
   def last_version
