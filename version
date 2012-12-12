@@ -128,6 +128,33 @@ class Version < Thor
     repo.checkout version
   end
 
+  desc 'gem', 'Publish private gem version'
+  def gem
+    return unless valid_repo? && valid_gem? && valid_pending_changes?
+
+    gem = Gem::Specification.load(gem_file)
+
+    puts "Generating version #{gem.version}"
+
+    puts '- Creating tag'
+    repo.tag "v#{gem.version}"
+
+    puts '- Pushing tag'
+    repo.push 'origin', "v#{gem.version}"
+
+    puts '- Packaging gem'
+    Open3.popen3 'rake build' do |i,o,e,t|
+      puts o.readlines
+      puts e.readlines
+    end
+
+    puts '- Sending to geminabox'
+    Open3.popen3 "gem inabox pkg/#{gem.name}-#{gem.version}.gem" do |i,o,e,t|
+      puts o.readlines
+      puts e.readlines
+    end
+  end
+
   private
 
   def repo
@@ -138,13 +165,34 @@ class Version < Thor
   	puts "Invalid application path [#{repo.location}]" unless repo.initialized?
   	repo.initialized?
   end
+
+  def valid_gem?
+    unless gem_file
+      puts "Is not gem path [#{repo.location}]"
+      return false
+    end
+    true
+  end
+
+  def gem_file
+    Dir.glob("#{repo.location}/*.gemspec").first
+  end
+
+  def valid_pending_changes?
+    if repo.status.any?
+      puts "There are pending changes (#{repo.status.count})"
+      false
+    else
+      true
+    end
+  end
   
   def valid_version?
     unless repo.current_branch.match /[0-9]+\.[0-9]+\.[0-9]+/
-	  puts "Is not branch version [#{repo.current_branch}]"
-	  return false
-	end
-	true
+      puts "Is not branch version [#{repo.current_branch}]"
+      return false
+    end
+    true
   end
 
   def last_version
