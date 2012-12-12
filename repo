@@ -11,6 +11,7 @@ end
 class Repo < Thor
 
   desc 'pull', 'Pull all repositories from gems and applications'
+
   def pull
     puts "Pulling repositories"
 
@@ -36,6 +37,7 @@ class Repo < Thor
   end
 
   desc 'push', 'Push all repositories from gems and applications'
+
   def push
     puts "Pushing repositories"
 
@@ -61,6 +63,7 @@ class Repo < Thor
   end
 
   desc 'pending', 'List repositories with pending commits'
+
   def pending
     puts "Pending changes"
 
@@ -76,15 +79,18 @@ class Repo < Thor
   end
 
   desc 'gems', 'List gems projects'
+
   def gems
     puts 'Listing gems'
 
-    repositories.each do |r|
-      name = File.basename(r.location)
-      if File.exist? "#{r.location}/#{name}.gemspec"
-        version = File.open("#{r.location}/lib/#{name}/version.rb", 'r') {|f| f.readlines[1]}.gsub('VERSION = ', '').gsub("\"", '').gsub("'", '').strip rescue 'UNKNOWN'
-        puts "  #{name.ljust(30, '-')}> v#{version}"
-      end
+    repositories.map { |r| Dir.glob("#{r.location}/*.gemspec") }.flatten.each do |file|
+      Dir.chdir File.dirname(file)
+      gem = Gem::Specification.load(file)
+      print "  #{gem.name} ".ljust(30, '-')
+      print '-> '
+      print "v#{gem.version}".ljust(10, ' ')
+      print ' | '
+      puts gem.description
     end
   end
 

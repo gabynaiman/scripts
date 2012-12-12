@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 require 'thor'
-require 'git_wrapper'
 require 'open3'
+require 'git_wrapper'
 
 GitWrapper.logger.level = Logger::ERROR
 
