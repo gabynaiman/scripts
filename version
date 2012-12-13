@@ -136,6 +136,9 @@ class Version < Thor
 
     puts "Generating version #{gem.version}"
 
+    puts '- Pushing changes'
+    repo.push
+
     puts '- Creating tag'
     repo.tag "v#{gem.version}"
 
