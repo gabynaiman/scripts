@@ -6,13 +6,13 @@ require 'git_wrapper'
 GitWrapper.logger.level = Logger::ERROR
 
 class VersionInfo
-  attr_accessor :mayor, :minor, :build
+  attr_accessor :major, :minor, :build
 
   def initialize(version)
     parts = version.split '.'
-  	@mayor = parts[0].to_i
-  	@minor = parts[1].to_i
-  	@build = parts[2].to_i
+    @major = parts[0].to_i
+    @minor = parts[1].to_i
+    @build = parts[2].to_i
   end
 
   def increment(part)
@@ -26,7 +26,13 @@ class VersionInfo
   end
 
   def to_s
-  	"#{mayor}.#{minor}.#{build}"
+    "#{major}.#{minor}.#{build}"
+  end
+
+  def <=>(other)
+    return major <=> other.major if (major <=> other.major) != 0
+    return minor <=> other.minor if (minor <=> other.minor) != 0
+    build <=> other.build
   end
 
 end
@@ -34,52 +40,58 @@ end
 class Version < Thor
 
   desc 'last', 'Get last version'
+
   def last
-  	return unless valid_repo?
+    return unless valid_repo?
     puts last_version
   end
 
   desc 'build', 'Increment tag and branch build version (0.0.1)'
+
   def build
-  	return unless valid_repo?
+    return unless valid_repo?
     release last_version.increment(:build)
   end
 
   desc 'minor', 'Increment tag and branch minor version (0.1.0)'
+
   def minor
-  	return unless valid_repo?
+    return unless valid_repo?
     release last_version.increment(:minor).reset(:build)
   end
 
-  desc 'mayor', 'Increment tag and branch mayor version (1.0.0)'
-  def mayor
-  	return unless valid_repo?
-    release last_version.increment(:mayor).reset(:minor).reset(:build)
+  desc 'major', 'Increment tag and branch major version (1.0.0)'
+
+  def major
+    return unless valid_repo?
+    release last_version.increment(:major).reset(:minor).reset(:build)
   end
 
   desc 'release', 'Generate tag and branch for specific version (Branch: 1.2.3, Tag: v1.2.3)'
-  def release(version=nil)
-  	return unless valid_repo?
-	return if !version && !valid_version?
 
-  	puts "Generating version #{version}"
-    
+  def release(version=nil)
+    return unless valid_repo?
+    return if !version && !valid_version?
+
+    puts "Generating version #{version}"
+
     puts '- Creating tag'
     repo.tag "v#{version || repo.current_branch}"
-    
+
     puts '- Pushing tag'
     repo.push 'origin', "v#{version || repo.current_branch}"
 
     if version
-	  puts '- Creating branch'
+      puts '- Creating branch'
       repo.branch version
     end
-      
+
     puts '- Pushing branch'
     repo.push 'origin', version || repo.current_branch
   end
 
   desc 'remove', 'Remove specific version from git repo'
+
   def remove(version)
     return unless valid_repo?
 
@@ -97,26 +109,29 @@ class Version < Thor
     puts '- Removing remote branch'
     repo.push 'origin', ":#{version}"
   end
-  
+
   desc 'fix', 'Increment build from current branch'
+
   def fix
     return if !valid_repo? || !valid_version?
-	
-	version = VersionInfo.new(repo.current_branch).increment(:build)
-	  
-	puts "Creating branch #{version}"
-	repo.branch version
-	 
-	puts 'Checkouting'
-	repo.checkout version
+
+    version = VersionInfo.new(repo.current_branch).increment(:build)
+
+    puts "Creating branch #{version}"
+    repo.branch version
+
+    puts 'Checkouting'
+    repo.checkout version
   end
 
   desc 'upgrade', 'Checkout last version'
+
   def upgrade
-  	change :last
+    change :last
   end
 
   desc 'change', 'Checkout specific version'
+
   def change(version)
     return unless valid_repo?
 
@@ -129,6 +144,7 @@ class Version < Thor
   end
 
   desc 'gem', 'Publish private gem version'
+
   def gem
     return unless valid_repo? && valid_gem? && valid_pending_changes?
 
@@ -146,13 +162,13 @@ class Version < Thor
     repo.push 'origin', "v#{gem.version}"
 
     puts '- Packaging gem'
-    Open3.popen3 'rake build' do |i,o,e,t|
+    Open3.popen3 'rake build' do |i, o, e, t|
       puts o.readlines
       puts e.readlines
     end
 
     puts '- Sending to geminabox'
-    Open3.popen3 "gem inabox pkg/#{gem.name}-#{gem.version}.gem" do |i,o,e,t|
+    Open3.popen3 "gem inabox pkg/#{gem.name}-#{gem.version}.gem" do |i, o, e, t|
       puts o.readlines
       puts e.readlines
     end
@@ -161,12 +177,12 @@ class Version < Thor
   private
 
   def repo
-  	GitWrapper::Repository.new Dir.pwd
+    GitWrapper::Repository.new Dir.pwd
   end
 
   def valid_repo?
-  	puts "Invalid application path [#{repo.location}]" unless repo.initialized?
-  	repo.initialized?
+    puts "Invalid application path [#{repo.location}]" unless repo.initialized?
+    repo.initialized?
   end
 
   def valid_gem?
@@ -189,7 +205,7 @@ class Version < Thor
       true
     end
   end
-  
+
   def valid_version?
     unless repo.current_branch.match /[0-9]+\.[0-9]+\.[0-9]+/
       puts "Is not branch version [#{repo.current_branch}]"
@@ -199,8 +215,11 @@ class Version < Thor
   end
 
   def last_version
-    last_tag = repo.tags.select{|t| t.match /v[0-9]+\.[0-9]+\.[0-9]+/}.sort.reverse.first
-    VersionInfo.new(last_tag ? last_tag[1..-1] : '0.0.0')
+    versions = repo.tags.
+        select { |t| t.match /v[0-9]+\.[0-9]+\.[0-9]+/ }.
+        map { |t| VersionInfo.new(t[1..-1]) }.
+        sort
+    versions.last || VersionInfo.new('v0.0.0')
   end
 
 end
