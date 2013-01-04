@@ -1,0 +1,123 @@
+#!/usr/bin/env ruby
+require 'feature_scorer'
+require 'cue_wrapper'
+require 'thor'
+require 'zip/zip'
+require 'thread/pool'
+require 'yaml'
+
+class AnalysisHelper
+  def initialize(analysis)
+    @analysis = analysis
+  end
+
+  def literals
+    @analysis.entry.token_interpretations.map { |ti| ti.text.downcase }.uniq
+  end
+
+  def concepts
+    @analysis.entry.token_interpretations.flat_map { |ti| ti.concepts.map { |c| c.to_s } }.uniq
+  end
+
+  def ocfs
+    @analysis.entry.token_interpretations.flat_map { |ti| ti.orthographically_correct.map { |ocf| ocf.text } }.uniq
+  end
+
+  def features
+    concepts.map { |c| {text: c, type: :concept} } |
+        ocfs.map { |ocf| {text: ocf, type: :ocf} } |
+        literals.map { |l| {text: l, type: :literal} }
+  end
+end
+
+class Corpus < Thor
+
+  desc 'create', 'Create corpus from CSV file [text, tag]'
+  method_option :rows, type: :numeric, aliases: '-r', desc: 'Rows limit'
+  method_option :threads, type: :numeric, aliases: '-t', desc: 'Thread pool size'
+
+  def create(csv_file)
+    puts "Creating corpus from #{csv_file}"
+    tmp_path = "/tmp/#{Time.now.to_i}"
+    basename = File.basename(csv_file, '.*')
+    path = "#{tmp_path}/#{basename}"
+
+    FileUtils.mkpath path
+
+    csv = File.open(csv_file, 'r') { |f| f.readlines }
+    rows_limit = options[:rows] || (csv.count - 1)
+    rows_processed = 0
+
+    cue = CueWrapper::Cue.new language: :english
+    runner = cue.send :cue
+
+    pool = Thread::Pool.new(options[:threads])
+    mutex = Mutex.new
+
+    start = Time.now
+    1.upto(rows_limit) do |i|
+      pool.process do
+        text, tag = csv[i].split('|')
+        puts "Analyzing #{i}/#{rows_limit}: #{text[0..60]}"
+        analysis = AnalysisHelper.new(runner.run(cue.send(:request, text)))
+        features = analysis.features.map { |f| FeatureScorer::Feature.new(f[:text], f[:type]) }
+        File.open("#{path}/#{i}.yml", 'w') { |f| f.write FeatureScorer::Document.new(features, tag.strip).to_yaml }
+        mutex.synchronize { rows_processed += 1 }
+        puts "Complete #{rows_processed}/#{rows_limit}: #{text[0..60]}"
+      end
+    end
+
+    loop do
+      break if rows_processed == rows_limit
+    end
+    finish = Time.now
+
+    pool.shutdown
+
+    zip path, "#{basename}.corpus"
+
+    FileUtils.rm_rf tmp_path
+    puts "Time: #{finish - start}"
+  end
+
+  desc 'scores', 'Calculate scores for corpus file'
+
+  def scores(corpus_file)
+    Zip::ZipFile.open(corpus_file, Zip::ZipFile::CREATE) do |zip|
+      puts 'Loading corpus'
+      documents = zip.entries.map do |f|
+        YAML.load zip.read(f.name)
+      end
+      corpus = FeatureScorer::Corpus.new(documents)
+
+      puts 'Calculating score'
+      mi_evaluator = FeatureScorer::MutualInformationEvaluator.new minimum_score: 0, low_frequency_limit: 5
+      chi2_evaluator = FeatureScorer::ChiSquareEvaluator.new minimum_score: 0, low_frequency_limit: 5
+      tf_idf_evaluator = FeatureScorer::FreqEvaluator.new low_frequency_limit: 5
+
+      File.open("#{File.basename(corpus_file, '.*')}_scores.csv", 'w') do |file|
+        file.puts 'Feature|MI Score|MI Tag|CHI2 Score|CHI2 Tag|TF-IDF Score|TF-IDF Tag'
+        corpus.occurrence_matrices.each do |feature, matrix|
+          puts "Processing feature: #{feature}"
+          file.puts "#{feature.text}|#{mi_evaluator.score(matrix)}|#{mi_evaluator.relevant_tag(matrix)}|#{chi2_evaluator.score(matrix)}|#{chi2_evaluator.relevant_tag(matrix)}|#{tf_idf_evaluator.score(feature, corpus)}|#{tf_idf_evaluator.relevant_tag(feature, corpus)}"
+        end
+      end
+    end
+  end
+
+  private
+
+  def zip(folder, zip_file)
+    puts 'Compressing corpus'
+    File.delete zip_file if File.exists?(zip_file)
+    Zip::ZipFile.open(zip_file, Zip::ZipFile::CREATE) do |zip|
+      Dir.glob("#{folder}/*.*").each do |f|
+        puts " - #{f}"
+        zip.add(File.basename(f), f)
+      end
+    end
+  end
+
+end
+
+Corpus.start
