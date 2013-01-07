@@ -1,10 +1,11 @@
 #!/usr/bin/env ruby
 require 'feature_scorer'
-require 'cue_wrapper'
+require 'cue_wrapper' if RUBY_PLATFORM == 'java'
 require 'thor'
 require 'zip/zip'
 require 'thread/pool'
 require 'yaml'
+require 'base64'
 
 class AnalysisHelper
   def initialize(analysis)
@@ -61,7 +62,7 @@ class Corpus < Thor
         puts "Analyzing #{i}/#{rows_limit}: #{text[0..60]}"
         analysis = AnalysisHelper.new(runner.run(cue.send(:request, text)))
         features = analysis.features.map { |f| FeatureScorer::Feature.new(f[:text], f[:type]) }
-        File.open("#{path}/#{i}.yml", 'w') { |f| f.write FeatureScorer::Document.new(features, tag.strip).to_yaml }
+        File.open("#{path}/#{i}.bin", 'w') { |f| f.write serialize(FeatureScorer::Document.new(features, tag.strip)) }
         mutex.synchronize { rows_processed += 1 }
         puts "Complete #{rows_processed}/#{rows_limit}: #{text[0..60]}"
       end
@@ -85,21 +86,26 @@ class Corpus < Thor
   def scores(corpus_file)
     Zip::ZipFile.open(corpus_file, Zip::ZipFile::CREATE) do |zip|
       puts 'Loading corpus'
+      i = 0
+      count = zip.entries.count
       documents = zip.entries.map do |f|
-        YAML.load zip.read(f.name)
+        puts "Parsing (#{i+=1}/#{count}): #{f.name}"
+        File.extname(f.name) == '.bin' ? deserialize(zip.read(f.name)) : YAML.load(zip.read(f.name))
       end
       corpus = FeatureScorer::Corpus.new(documents)
 
       puts 'Calculating score'
       mi_evaluator = FeatureScorer::MutualInformationEvaluator.new minimum_score: 0, low_frequency_limit: 5
       chi2_evaluator = FeatureScorer::ChiSquareEvaluator.new minimum_score: 0, low_frequency_limit: 5
-      tf_idf_evaluator = FeatureScorer::FreqEvaluator.new low_frequency_limit: 5
+      tf_idf_evaluator = FeatureScorer::FrequencyEvaluator.new low_frequency_limit: 5
 
       File.open("#{File.basename(corpus_file, '.*')}_scores.csv", 'w') do |file|
         file.puts 'Feature|MI Score|MI Tag|CHI2 Score|CHI2 Tag|TF-IDF Score|TF-IDF Tag'
+        i = 0
+        count = corpus.occurrence_matrices.count
         corpus.occurrence_matrices.each do |feature, matrix|
-          puts "Processing feature: #{feature}"
-          file.puts "#{feature.text}|#{mi_evaluator.score(matrix)}|#{mi_evaluator.relevant_tag(matrix)}|#{chi2_evaluator.score(matrix)}|#{chi2_evaluator.relevant_tag(matrix)}|#{tf_idf_evaluator.score(feature, corpus)}|#{tf_idf_evaluator.relevant_tag(feature, corpus)}"
+          puts "Processing feature (#{i+=1}/#{count}): #{feature}"
+          file.puts "#{feature.text} (#{feature.type})|#{mi_evaluator.score(matrix)}|#{mi_evaluator.relevant_tag(matrix)}|#{chi2_evaluator.score(matrix)}|#{chi2_evaluator.relevant_tag(matrix)}|#{tf_idf_evaluator.score(feature, corpus)}|#{tf_idf_evaluator.relevant_tag(feature, corpus)}"
         end
       end
     end
@@ -116,6 +122,14 @@ class Corpus < Thor
         zip.add(File.basename(f), f)
       end
     end
+  end
+
+  def serialize(object)
+    Base64.encode64(Marshal.dump(object))
+  end
+
+  def deserialize(string)
+    Marshal.load(Base64.decode64(string))
   end
 
 end
