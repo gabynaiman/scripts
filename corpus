@@ -84,6 +84,7 @@ class Corpus < Thor
   desc 'scores', 'Calculate scores for corpus file'
 
   def scores(corpus_file)
+    start = Time.now
     Zip::ZipFile.open(corpus_file, Zip::ZipFile::CREATE) do |zip|
       puts 'Loading corpus'
       i = 0
@@ -105,10 +106,11 @@ class Corpus < Thor
         count = corpus.occurrence_matrices.count
         corpus.occurrence_matrices.each do |feature, matrix|
           puts "Processing feature (#{i+=1}/#{count}): #{feature}"
-          file.puts "#{feature.text} (#{feature.type})|#{mi_evaluator.score(matrix)}|#{mi_evaluator.relevant_tag(matrix)}|#{chi2_evaluator.score(matrix)}|#{chi2_evaluator.relevant_tag(matrix)}|#{tf_idf_evaluator.score(feature, corpus)}|#{tf_idf_evaluator.relevant_tag(feature, corpus)}"
+          file.puts "#{feature.text} (#{feature.type})|#{mi_evaluator.score(feature, corpus)}|#{mi_evaluator.relevant_tag(feature, corpus)}|#{chi2_evaluator.score(feature, corpus)}|#{chi2_evaluator.relevant_tag(feature, corpus)}|#{tf_idf_evaluator.score(feature, corpus)}|#{tf_idf_evaluator.relevant_tag(feature, corpus)}"
         end
       end
     end
+    puts "Time: #{Time.now - start}"
   end
 
   private
