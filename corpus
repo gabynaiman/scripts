@@ -75,7 +75,7 @@ class Corpus < Thor
 
     pool.shutdown
 
-    zip path, "#{basename}.corpus"
+    zip path, "#{basename}_#{rows_limit}rows.corpus"
 
     FileUtils.rm_rf tmp_path
     puts "Time: #{finish - start}"
@@ -95,18 +95,24 @@ class Corpus < Thor
       end
       corpus = FeatureScorer::Corpus.new(documents)
 
+      puts "Detected tags: #{corpus.tags.join(', ')}"
+      if corpus.tags.count < 2
+        puts "Can't calculate feature selection if corpus has less than two tags"
+        return
+      end
+
       puts 'Calculating score'
       mi_evaluator = FeatureScorer::MutualInformationEvaluator.new minimum_score: 0, low_frequency_limit: 5
       chi2_evaluator = FeatureScorer::ChiSquareEvaluator.new minimum_score: 0, low_frequency_limit: 5
       tf_idf_evaluator = FeatureScorer::FrequencyEvaluator.new low_frequency_limit: 5
 
       File.open("#{File.basename(corpus_file, '.*')}_scores.csv", 'w') do |file|
-        file.puts 'Feature|MI Score|MI Tag|CHI2 Score|CHI2 Tag|TF-IDF Score|TF-IDF Tag'
+        file.puts 'Feature|Type|MI Score|MI Tag|CHI2 Score|CHI2 Tag|TF-IDF Score|TF-IDF Tag'
         i = 0
         count = corpus.occurrence_matrices.count
         corpus.occurrence_matrices.each do |feature, matrix|
           puts "Processing feature (#{i+=1}/#{count}): #{feature}"
-          file.puts "#{feature.text} (#{feature.type})|#{mi_evaluator.score(feature, corpus)}|#{mi_evaluator.relevant_tag(feature, corpus)}|#{chi2_evaluator.score(feature, corpus)}|#{chi2_evaluator.relevant_tag(feature, corpus)}|#{tf_idf_evaluator.score(feature, corpus)}|#{tf_idf_evaluator.relevant_tag(feature, corpus)}"
+          file.puts "#{feature.text}|#{feature.type}|#{mi_evaluator.score(feature, corpus)}|#{mi_evaluator.relevant_tag(feature, corpus)}|#{chi2_evaluator.score(feature, corpus)}|#{chi2_evaluator.relevant_tag(feature, corpus)}|#{tf_idf_evaluator.score(feature, corpus)}|#{tf_idf_evaluator.relevant_tag(feature, corpus)}"
         end
       end
     end
