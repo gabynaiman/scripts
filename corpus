@@ -32,7 +32,7 @@ class AnalysisHelper
 end
 
 class ScoreExporter
-
+  
   def initialize(evaluator, output_file)
     @evaluator = evaluator
     @output_file = output_file
@@ -52,7 +52,7 @@ class ScoreExporter
 
   def write(feature, corpus)
     m = corpus.occurrence_matrices[feature]
-    @file.puts "#{feature.text}|#{feature.type}|#{@evaluator.score(feature, corpus)}|#{@evaluator.relevant_tag(feature, corpus)}|#{m.n11}|#{m.n10}|#{m.n01}|#{m.n00}|#{m.n1_}|#{m.specific_occurrences}|#{m.residue_occurrences}"
+    @file.puts "\"#{feature.text}\"|#{feature.type}|#{@evaluator.score(feature, corpus)}|#{@evaluator.relevant_tag(feature, corpus)}|#{m.n11}|#{m.n10}|#{m.n01}|#{m.n00}|#{m.n1_}|#{m.specific_occurrences}|#{m.residue_occurrences}"
   end
 
 end
