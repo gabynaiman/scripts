@@ -13,22 +13,48 @@ class AnalysisHelper
   end
 
   def literals
-    @analysis.entry.token_interpretations.map { |ti| ti.text.downcase }.uniq
+    @analysis.entry.token_interpretations.map { |ti| ti.text.downcase }
   end
 
   def concepts
-    @analysis.entry.token_interpretations.flat_map { |ti| ti.concepts.map { |c| c.to_s } }.uniq
+    @analysis.entry.token_interpretations.flat_map { |ti| ti.concepts.map { |c| c.to_s } }
   end
 
   def ocfs
-    @analysis.entry.token_interpretations.flat_map { |ti| ti.orthographically_correct.map { |ocf| ocf.text } }.uniq
+    @analysis.entry.token_interpretations.flat_map { |ti| ti.orthographically_correct.map { |ocf| ocf.text } }
   end
 
   def features
-    concepts.map { |c| {text: c, type: :concept} } |
-        ocfs.map { |ocf| {text: ocf, type: :ocf} } |
+    concepts.map { |c| {text: c, type: :concept} } +
+        ocfs.map { |ocf| {text: ocf, type: :ocf} } +
         literals.map { |l| {text: l, type: :literal} }
   end
+end
+
+class ScoreExporter
+
+  def initialize(evaluator, output_file)
+    @evaluator = evaluator
+    @output_file = output_file
+  end
+
+  def open
+    @file = File.open(@output_file, 'w')
+  end
+
+  def close
+    @file.close if @file
+  end
+
+  def write_header(tags)
+    @file.puts "Feature|Type|Score|Tag|N11|N10|N01|N00|Uniq x Doc|Freq Abs #{tags[0]}|Freq Abs #{tags[1]}"
+  end
+
+  def write(feature, corpus)
+    m = corpus.occurrence_matrices[feature]
+    @file.puts "#{feature.text}|#{feature.type}|#{@evaluator.score(feature, corpus)}|#{@evaluator.relevant_tag(feature, corpus)}|#{m.n11}|#{m.n10}|#{m.n01}|#{m.n00}|#{m.n1_}|#{m.specific_occurrences}|#{m.residue_occurrences}"
+  end
+
 end
 
 class Corpus < Thor
@@ -102,21 +128,29 @@ class Corpus < Thor
       end
 
       puts 'Calculating score'
-      mi_evaluator = FeatureScorer::MutualInformationEvaluator.new minimum_score: 0, low_frequency_limit: 5
-      chi2_evaluator = FeatureScorer::ChiSquareEvaluator.new minimum_score: 0, low_frequency_limit: 5
-      tf_idf_evaluator = FeatureScorer::FrequencyEvaluator.new low_frequency_limit: 5
+      exporters = [
+          ScoreExporter.new(FeatureScorer::MutualInformationEvaluator.new, "#{File.basename(corpus_file, '.*')}_mi_scores.csv"),
+          ScoreExporter.new(FeatureScorer::ChiSquareEvaluator.new, "#{File.basename(corpus_file, '.*')}_chi_scores.csv"),
+          ScoreExporter.new(FeatureScorer::TfIdfEvaluator.new, "#{File.basename(corpus_file, '.*')}_tf_idf_scores.csv"),
+          ScoreExporter.new(FeatureScorer::PlainFrequencyEvaluator.new, "#{File.basename(corpus_file, '.*')}_plain_scores.csv")
+      ]
 
-      File.open("#{File.basename(corpus_file, '.*')}_scores.csv", 'w') do |file|
-        file.puts 'Feature|Type|MI Score|MI Tag|CHI2 Score|CHI2 Tag|TF-IDF Score|TF-IDF Tag'
-        i = 0
-        count = corpus.occurrence_matrices.count
-        corpus.occurrence_matrices.each do |feature, matrix|
-          puts "Processing feature (#{i+=1}/#{count}): #{feature}"
-          file.puts "#{feature.text}|#{feature.type}|#{mi_evaluator.score(feature, corpus)}|#{mi_evaluator.relevant_tag(feature, corpus)}|#{chi2_evaluator.score(feature, corpus)}|#{chi2_evaluator.relevant_tag(feature, corpus)}|#{tf_idf_evaluator.score(feature, corpus)}|#{tf_idf_evaluator.relevant_tag(feature, corpus)}"
-        end
+      exporters.each do |e|
+        e.open
+        e.write_header corpus.tags
       end
+
+      uniq_features = corpus.features.uniq
+      i = 0
+      uniq_features.each do |feature|
+        puts "Processing feature (#{i+=1}/#{uniq_features.count}): #{feature}"
+        exporters.each { |e| e.write feature, corpus }
+      end
+
+      exporters.each { |e| e.close }
+
+      puts "Time: #{Time.now - start}"
     end
-    puts "Time: #{Time.now - start}"
   end
 
   private
