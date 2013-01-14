@@ -32,7 +32,7 @@ class AnalysisHelper
 end
 
 class ScoreExporter
-  
+
   def initialize(evaluator, output_file)
     @evaluator = evaluator
     @output_file = output_file
@@ -111,46 +111,62 @@ class Corpus < Thor
 
   def scores(corpus_file)
     start = Time.now
-    Zip::ZipFile.open(corpus_file, Zip::ZipFile::CREATE) do |zip|
-      puts 'Loading corpus'
-      i = 0
-      count = zip.entries.count
-      documents = zip.entries.map do |f|
-        puts "Parsing (#{i+=1}/#{count}): #{f.name}"
-        File.extname(f.name) == '.bin' ? deserialize(zip.read(f.name)) : YAML.load(zip.read(f.name))
-      end
-      corpus = FeatureScorer::Corpus.new(documents)
+    corpus = load_corpus(corpus_file)
 
-      puts "Detected tags: #{corpus.tags.join(', ')}"
-      if corpus.tags.count < 2
-        puts "Can't calculate feature selection if corpus has less than two tags"
-        return
-      end
-
-      puts 'Calculating score'
-      exporters = [
-          ScoreExporter.new(FeatureScorer::MutualInformationEvaluator.new, "#{File.basename(corpus_file, '.*')}_mi_scores.csv"),
-          ScoreExporter.new(FeatureScorer::ChiSquareEvaluator.new, "#{File.basename(corpus_file, '.*')}_chi_scores.csv"),
-          ScoreExporter.new(FeatureScorer::TfIdfEvaluator.new, "#{File.basename(corpus_file, '.*')}_tf_idf_scores.csv"),
-          ScoreExporter.new(FeatureScorer::PlainFrequencyEvaluator.new, "#{File.basename(corpus_file, '.*')}_plain_scores.csv")
-      ]
-
-      exporters.each do |e|
-        e.open
-        e.write_header corpus.tags
-      end
-
-      uniq_features = corpus.features.uniq
-      i = 0
-      uniq_features.each do |feature|
-        puts "Processing feature (#{i+=1}/#{uniq_features.count}): #{feature}"
-        exporters.each { |e| e.write feature, corpus }
-      end
-
-      exporters.each { |e| e.close }
-
-      puts "Time: #{Time.now - start}"
+    puts "Detected tags: #{corpus.tags.join(', ')}"
+    if corpus.tags.count < 2
+      puts "Can't calculate feature selection if corpus has less than two tags"
+      return
     end
+
+    puts 'Calculating score'
+    exporters = [
+        ScoreExporter.new(FeatureScorer::MutualInformationEvaluator.new, "#{File.basename(corpus_file, '.*')}_mi_scores.csv"),
+        ScoreExporter.new(FeatureScorer::ChiSquareEvaluator.new, "#{File.basename(corpus_file, '.*')}_chi_scores.csv"),
+        ScoreExporter.new(FeatureScorer::TfIdfEvaluator.new, "#{File.basename(corpus_file, '.*')}_tf_idf_scores.csv"),
+        ScoreExporter.new(FeatureScorer::PlainFrequencyEvaluator.new, "#{File.basename(corpus_file, '.*')}_plain_scores.csv")
+    ]
+
+    exporters.each do |e|
+      e.open
+      e.write_header corpus.tags
+    end
+
+    uniq_features = corpus.features.uniq
+    i = 0
+    uniq_features.each do |feature|
+      puts "Processing feature (#{i+=1}/#{uniq_features.count}): #{feature}"
+      exporters.each { |e| e.write feature, corpus }
+    end
+
+    exporters.each { |e| e.close }
+
+    File.open("#{File.basename(corpus_file, '.*')}_info.txt", 'w') do |f|
+      specific_tag_count = corpus.select { |d| d.tag == corpus.tags[0] }.count
+      residue_tag_count = corpus.select { |d| d.tag == corpus.tags[1] }.count
+      uniq_features = corpus.features.uniq
+      f.puts 'Tags:'
+      f.puts "- #{corpus.tags[0]}: (specific) #{specific_tag_count}"
+      f.puts "- #{corpus.tags[1]}: (specific) #{residue_tag_count}"
+
+      f.puts "Documents: #{corpus.count}"
+
+      f.puts 'Features (uniq):'
+      f.puts "- Literal: #{uniq_features.select { |f| f.type == :literal }.count}"
+      f.puts "- Concept: #{uniq_features.select { |f| f.type == :concept }.count}"
+      f.puts "- OCF: #{uniq_features.select { |f| f.type == :ocf }.count}"
+
+      tokens_count = corpus.features.select { |f| f.type == :literal }.count
+      f.puts "Tokens: #{tokens_count}"
+      f.puts "Token Avg: #{tokens_count/corpus.count}"
+
+      f.puts 'Histogram:'
+      histogram(corpus).each do |k, v|
+        f.puts "- #{k} tokens: #{v} documents"
+      end
+    end
+
+    puts "Time: #{Time.now - start}"
   end
 
   private
@@ -163,6 +179,37 @@ class Corpus < Thor
         puts " - #{f}"
         zip.add(File.basename(f), f)
       end
+    end
+  end
+
+  def load_corpus(corpus_file)
+    corpus = nil
+    Zip::ZipFile.open(corpus_file, Zip::ZipFile::CREATE) do |zip|
+      puts 'Loading corpus'
+      i = 0
+      count = zip.entries.count
+      documents = zip.entries.map do |f|
+        puts "Parsing (#{i+=1}/#{count}): #{f.name}"
+        File.extname(f.name) == '.bin' ? deserialize(zip.read(f.name)) : YAML.load(zip.read(f.name))
+      end
+      corpus = FeatureScorer::Corpus.new(documents)
+    end
+    corpus
+  end
+
+  def histogram(corpus)
+    documents = corpus.map { |d| d.features.select { |f| f.type == :literal }.count }.sort
+
+    slot = ((documents.last - documents.first).to_f / 10).round(1)
+
+    previous = documents.first
+
+    1.upto(10).inject({}) do |hash, i|
+      current = (previous + slot).round(1)
+      hash["#{previous.to_i} to #{current.to_i}"] = documents.select { |n| n >= previous && n < current }.count
+      hash["#{previous.to_i} to #{current.to_i}"] += 1 if i == 10
+      previous = current
+      hash
     end
   end
 
