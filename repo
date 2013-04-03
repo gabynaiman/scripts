@@ -1,7 +1,6 @@
 #!/usr/bin/env ruby
 require 'thor'
 require 'git_wrapper'
-require 'open3'
 
 GitWrapper.logger.level = Logger::ERROR
 
@@ -11,13 +10,14 @@ end
 class Repo < Thor
 
   desc 'pull', 'Pull all repositories from gems and applications'
+  method_option :server, aliases: '-s', desc: 'Git origin server'
 
   def pull
     puts "Pulling repositories"
 
     result = Result.new 0, 0, 0
 
-    repositories.each do |r|
+    repositories(options[:server]).each do |r|
       name = "#{File.basename(r.location)} "
       print "  #{name.ljust(30, '-')}> "
 
@@ -37,13 +37,14 @@ class Repo < Thor
   end
 
   desc 'push', 'Push all repositories from gems and applications'
+  method_option :server, aliases: '-s', desc: 'Git origin server'
 
   def push
     puts "Pushing repositories"
 
     result = Result.new 0, 0, 0
 
-    repositories.each do |r|
+    repositories(options[:server]).each do |r|
       name = "#{File.basename(r.location)} "
       print "  #{name.ljust(30, '-')}> "
 
@@ -63,12 +64,13 @@ class Repo < Thor
   end
 
   desc 'pending', 'List repositories with pending commits'
+  method_option :server, aliases: '-s', desc: 'Git origin server'
 
   def pending
     puts "Pending changes"
 
     count = 0
-    repositories.each do |r|
+    repositories(options[:server]).each do |r|
       if r.status.any?
         puts "  #{File.basename r.location} (#{r.status.count})"
         count += 1
@@ -79,11 +81,12 @@ class Repo < Thor
   end
 
   desc 'gems', 'List gems projects'
+  method_option :server, aliases: '-s', desc: 'Git origin server'
 
   def gems
     puts 'Listing gems'
 
-    repositories.map { |r| Dir.glob("#{r.location}/*.gemspec") }.flatten.each do |file|
+    repositories(options[:server]).map { |r| Dir.glob("#{r.location}/*.gemspec") }.flatten.each do |file|
       Dir.chdir File.dirname(file)
       gem = Gem::Specification.load(file)
       print "  #{gem.name} ".ljust(30, '-')
@@ -94,14 +97,25 @@ class Repo < Thor
     end
   end
 
+  desc 'list', 'List all repositories'
+  method_option :server, aliases: '-s', desc: 'Git origin server'
+
+  def list
+    repositories(options[:server]).each do |r|
+      puts r.location
+    end
+  end
+
   private
 
-  def repositories
+  def repositories(server=nil)
     gems_path = File.expand_path('../../gems', __FILE__)
     app_path = File.expand_path('../../applications', __FILE__)
     scripts_path = File.expand_path('../../scripts', __FILE__)
     sources = [gems_path, app_path].map { |s| Dir.entries(s).map { |e| "#{s}/#{e}" } }.flatten << scripts_path
-    sources.map { |path| GitWrapper::Repository.new(path) }.select { |r| r.initialized? }
+    sources.map { |path| GitWrapper::Repository.new(path) }.select do |r|
+      r.initialized? && (server.nil? || r.config('remote.origin.url').match(%r(.+@#{server}:.+)))
+    end
   end
 
 end
