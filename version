@@ -148,18 +148,18 @@ class Version < Thor
   def gem
     return unless valid_repo? && valid_gem? && valid_pending_changes?
 
-    gem = Gem::Specification.load(gem_file)
+    gemspec = Gem::Specification.load(gem_file)
 
-    puts "Generating version #{gem.version}"
+    puts "Generating version #{gemspec.version}"
 
     puts '- Pushing changes'
     repo.push
 
     puts '- Creating tag'
-    repo.tag "v#{gem.version}"
+    repo.tag "v#{gemspec.version}"
 
     puts '- Pushing tag'
-    repo.push 'origin', "v#{gem.version}"
+    repo.push 'origin', "v#{gemspec.version}"
 
     puts '- Packaging gem'
     Open3.popen3 'rake build' do |i, o, e, t|
@@ -168,7 +168,7 @@ class Version < Thor
     end
 
     puts '- Sending to geminabox'
-    Open3.popen3 "gem inabox pkg/#{gem.name}-#{gem.version}.gem" do |i, o, e, t|
+    Open3.popen3 "gem inabox pkg/#{gemspec.name}-#{gemspec.version}.gem" do |i, o, e, t|
       puts o.readlines
       puts e.readlines
     end

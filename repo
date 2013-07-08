@@ -88,12 +88,12 @@ class Repo < Thor
 
     repositories(options[:server]).map { |r| Dir.glob("#{r.location}/*.gemspec") }.flatten.each do |file|
       Dir.chdir File.dirname(file)
-      gem = Gem::Specification.load(file)
-      print "  #{gem.name} ".ljust(30, '-')
+      gemspec = Gem::Specification.load(file)
+      print "  #{gemspec.name} ".ljust(30, '-')
       print '-> '
-      print "v#{gem.version}".ljust(10, ' ')
+      print "v#{gemspec.version}".ljust(10, ' ')
       print ' | '
-      puts gem.description
+      puts gemspec.description
     end
   end
 
@@ -115,7 +115,7 @@ class Repo < Thor
     sources = [gems_path, app_path].map { |s| Dir.entries(s).map { |e| "#{s}/#{e}" } }.flatten << scripts_path
     sources.map { |path| GitWrapper::Repository.new(path) }.select do |r|
       r.initialized? && (server.nil? || r.config('remote.origin.url').match(%r(.+@#{server}:.+)))
-    end
+    end.sort_by(&:location)
   end
 
 end
