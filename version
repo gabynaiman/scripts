@@ -67,8 +67,8 @@ class Version < Thor
 
     puts "Generating version #{version}"
 
+    puts '- Pushing master'
     File.open("#{repo.location}/.version", 'w'){|f| f.write version}
-
     repo.add '.version'
     repo.commit "Release version #{version}"
     repo.push
