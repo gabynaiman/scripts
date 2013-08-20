@@ -18,8 +18,8 @@ class Repo < Thor
     result = Result.new 0, 0, 0
 
     repositories(options[:server]).each do |r|
-      name = "#{File.basename(r.location)} "
-      print "  #{name.ljust(30, '-')}> "
+      name = "#{File.basename(r.location)} (#{r.current_branch}) "
+      print "  #{name.ljust(50, '-')}> "
 
       if r.status.any?
         puts "Pending commit"
@@ -45,8 +45,8 @@ class Repo < Thor
     result = Result.new 0, 0, 0
 
     repositories(options[:server]).each do |r|
-      name = "#{File.basename(r.location)} "
-      print "  #{name.ljust(30, '-')}> "
+      name = "#{File.basename(r.location)} (#{r.current_branch}) "
+      print "  #{name.ljust(50, '-')}> "
 
       if r.status.any?
         puts "Pending commit"
