@@ -177,6 +177,7 @@ class Version < Thor
   end
 
   def last_version
+    repo.fetch
     versions = repo.tags.
         select { |t| t.match /v[0-9]+\.[0-9]+\.[0-9]+/ }.
         map { |t| VersionInfo.new(t[1..-1]) }.
