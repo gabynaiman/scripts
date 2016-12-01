@@ -72,7 +72,7 @@ class Repo < Thor
     count = 0
     repositories(options[:server]).each do |r|
       if r.status.any?
-        puts "  #{File.basename r.location} (#{r.status.count})"
+        puts "  #{r.location} (#{r.status.count})"
         count += 1
       end
     end
@@ -112,7 +112,12 @@ class Repo < Thor
     gems_path = File.expand_path('../../gems', __FILE__)
     app_path = File.expand_path('../../applications', __FILE__)
     scripts_path = File.expand_path('../../scripts', __FILE__)
-    sources = [gems_path, app_path].map { |s| Dir.entries(s).map { |e| "#{s}/#{e}" } }.flatten << scripts_path
+
+    sources = []
+    sources += Dir.glob("#{gems_path}/**/*.gemspec").map { |f| File.dirname(f) }
+    sources += Dir.entries(app_path).map { |d| File.join(app_path, d) }
+    sources << scripts_path
+
     sources.map { |path| GitWrapper::Repository.new(path) }.select do |r|
       r.initialized? && (server.nil? || r.config('remote.origin.url').match(%r(.+@#{server}:.+)))
     end.sort_by(&:location)
