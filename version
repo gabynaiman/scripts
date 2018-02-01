@@ -124,7 +124,7 @@ class Version < Thor
     repo.push 'origin', "v#{gemspec.version}"
 
     puts '- Packaging gem'
-    Open3.popen3 'rake build' do |i, o, e, t|
+    Open3.popen3 'bundle exec rake build' do |i, o, e, t|
       puts o.readlines
       puts e.readlines
     end
