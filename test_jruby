@@ -4,14 +4,15 @@
 echoerr() { echo "$@" 1>&2; }
 
 ### Select jruby version from latest jruby 9  version
-jruby_versions=$(rvm ls | grep 'jruby-9' | sed -r 's/^.*(jruby-9[^ ]+).*$/\1/')
-jruby_version=""
+# jruby_versions=$(rvm ls | grep 'jruby-9' | sed -r 's/^.*(jruby-9[^ ]+).*$/\1/')
+#Force 9.1.13 because of error in latest
+jruby_version="jruby-9.1.13.0"
 
-for candidate in $jruby_versions; do
-  if [[ candidate > $jruby_version ]]; then
-    jruby_version=$candidate
-  fi
-done
+# for candidate in $jruby_versions; do
+#   if [[ candidate > $jruby_version ]]; then
+#     jruby_version=$candidate
+#   fi
+# done
 
 if [[ $jruby_version == "" ]]; then
   echoerr "Couldn't find jruby 9. Download it using 'rvm install'"
