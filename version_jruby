@@ -1,4 +1,4 @@
-JRUBY_VERSION='jruby-9.1.13.0'
+JRUBY_VERSION='jruby-9.1.16.0'
 GEMSPEC_NAME=$(ls | grep '.gemspec' | sed -r 's/^(.*)\.gemspec$/\1/')
 VERSION=$(git describe --abbrev=0 --tags | sed -r 's/^v(.*)$/\1/')
 

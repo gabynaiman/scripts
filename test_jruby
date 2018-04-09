@@ -6,7 +6,7 @@ echoerr() { echo "$@" 1>&2; }
 ### Select jruby version from latest jruby 9  version
 # jruby_versions=$(rvm ls | grep 'jruby-9' | sed -r 's/^.*(jruby-9[^ ]+).*$/\1/')
 #Force 9.1.13 because of error in latest
-jruby_version="jruby-9.1.13.0"
+jruby_version="jruby-9.1.16.0"
 
 # for candidate in $jruby_versions; do
 #   if [[ candidate > $jruby_version ]]; then
@@ -37,7 +37,7 @@ fi
 
 ### Bundle and run tests
 $HOME/.rvm/gems/$jruby_version@$gemset_name/wrappers/bundle
-JRUBY_OPTS="--debug" $HOME/.rvm/gems/$jruby_version@$gemset_name/wrappers/bundle exec rake 
+JAVA_OPTS="-Xss4m" JRUBY_OPTS="--debug" $HOME/.rvm/gems/$jruby_version@$gemset_name/wrappers/bundle exec rake
 
 # ### Restore old gemfile lock
 rm Gemfile.lock
