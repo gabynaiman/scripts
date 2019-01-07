@@ -32,7 +32,7 @@ if [ ! -d $HOME/.rvm/gems/$jruby_version@$gemset_name/wrappers/ ]; then
   rvm $jruby_version do rvm gemset create $gemset_name
 
   ### Set jruby 9
-  $HOME/.rvm/gems/$jruby_version@$gemset_name/wrappers/gem install bundler
+  $HOME/.rvm/gems/$jruby_version@$gemset_name/wrappers/gem install bundler -v "< 2"
 fi
 
 ### Bundle and run tests
