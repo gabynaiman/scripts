@@ -16,11 +16,11 @@ fi
 
 mv Gemfile.lock Gemfile.old
 
-rvm use "$JRUBY_VERSION@$GEMSPEC_NAME"
+rvm use "$JRUBY_VERSION@$GEMSPEC_NAME" --create
 
 if [[ "$(gem list -i \"^bundler$\")" == "false" ]];then
   echo 'Installing bundler'
-  gem install bundler
+  gem install bundler -v "< 2"
 fi
 
 bundle
