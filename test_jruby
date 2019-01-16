@@ -37,7 +37,7 @@ fi
 
 ### Bundle and run tests
 $HOME/.rvm/gems/$jruby_version@$gemset_name/wrappers/bundle
-JAVA_OPTS="-Xss4m" JRUBY_OPTS="--debug" $HOME/.rvm/gems/$jruby_version@$gemset_name/wrappers/bundle exec rake
+JAVA_OPTS="-Xss128m" JRUBY_OPTS="--debug" $HOME/.rvm/gems/$jruby_version@$gemset_name/wrappers/bundle exec rake
 
 # ### Restore old gemfile lock
 rm Gemfile.lock
