@@ -1,47 +1,33 @@
-#!/bin/bash
+JRUBY_VERSION='jruby-9.2.9.0'
+GEMSET_NAME=$(ls | grep '.gemspec' | sed -r 's/^(.*)\.gemspec$/\1/')
 
-### Echo errro function
-echoerr() { echo "$@" 1>&2; }
+source "$HOME/.rvm/scripts/rvm"
 
-### Select jruby version from latest jruby 9  version
-# jruby_versions=$(rvm ls | grep 'jruby-9' | sed -r 's/^.*(jruby-9[^ ]+).*$/\1/')
-#Force 9.1.13 because of error in latest
-jruby_version="jruby-9.1.16.0"
-
-# for candidate in $jruby_versions; do
-#   if [[ candidate > $jruby_version ]]; then
-#     jruby_version=$candidate
-#   fi
-# done
-
-if [[ $jruby_version == "" ]]; then
-  echoerr "Couldn't find jruby 9. Download it using 'rvm install'"
-  exit 1
+if [[ $(rvm ls | grep "$JRUBY_VERSION") == "" ]]; then
+  echo "Installing $JRUBY_VERSION"
+  rvm install $JRUBY_VERSION
 fi
 
-### Getting gem name
-gemset_name=$(cat '.ruby-gemset')
-echo "Test for gem '$gemset_name' : Running with $jruby_version"
+if [ ! -d "$HOME/.rvm/gems/$JRUBY_VERSION@$GEMSET_NAME" ];then
+  echo "Creating gemset $GEMSET_NAME"
+  rvm gemset create $GEMSET_NAME
+fi
 
-# ### Backup old gemfile lock
 mv Gemfile.lock Gemfile.old
 
-### Check if a folder for de ruby version and gemset doesn't exists
-if [ ! -d $HOME/.rvm/gems/$jruby_version@$gemset_name/wrappers/ ]; then
-  ### create gemset
-  rvm $jruby_version do rvm gemset create $gemset_name
+rvm use "$JRUBY_VERSION@$GEMSET_NAME" --create
 
-  ### Set jruby 9
-  $HOME/.rvm/gems/$jruby_version@$gemset_name/wrappers/gem install bundler -v "< 2"
+if [[ "$(gem list -i \"^bundler$\")" == "false" ]];then
+  echo 'Installing bundler'
+  gem install bundler
 fi
 
-### Bundle and run tests
-$HOME/.rvm/gems/$jruby_version@$gemset_name/wrappers/bundle
-JAVA_OPTS="-Xss128m" JRUBY_OPTS="--debug" $HOME/.rvm/gems/$jruby_version@$gemset_name/wrappers/bundle exec rake
+bundle
 
-# ### Restore old gemfile lock
+JAVA_OPTS="-Xss128m" JRUBY_OPTS="--debug" bundle exec rake
+
 rm Gemfile.lock
+
 mv Gemfile.old Gemfile.lock
 
-### Restore original gemset
 cd .

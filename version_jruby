@@ -1,5 +1,5 @@
-JRUBY_VERSION='jruby-9.1.16.0'
-GEMSPEC_NAME=$(ls | grep '.gemspec' | sed -r 's/^(.*)\.gemspec$/\1/')
+JRUBY_VERSION='jruby-9.2.9.0'
+GEMSET_NAME=$(ls | grep '.gemspec' | sed -r 's/^(.*)\.gemspec$/\1/')
 VERSION=$(git describe --abbrev=0 --tags | sed -r 's/^v(.*)$/\1/')
 
 source "$HOME/.rvm/scripts/rvm"
@@ -9,18 +9,18 @@ if [[ $(rvm ls | grep "$JRUBY_VERSION") == "" ]]; then
   rvm install $JRUBY_VERSION
 fi
 
-if [ ! -d "$HOME/.rvm/gems/$JRUBY_VERSION@$GEMSPEC_NAME" ];then
-  echo "Creating gemspec $GEMSPEC_NAME"
-  rvm gemset create $GEMSPEC_NAME
+if [ ! -d "$HOME/.rvm/gems/$JRUBY_VERSION@$GEMSET_NAME" ];then
+  echo "Creating gemset $GEMSET_NAME"
+  rvm gemset create $GEMSET_NAME
 fi
 
 mv Gemfile.lock Gemfile.old
 
-rvm use "$JRUBY_VERSION@$GEMSPEC_NAME" --create
+rvm use "$JRUBY_VERSION@$GEMSET_NAME" --create
 
 if [[ "$(gem list -i \"^bundler$\")" == "false" ]];then
   echo 'Installing bundler'
-  gem install bundler -v "< 2"
+  gem install bundler
 fi
 
 bundle
@@ -32,7 +32,7 @@ if [[ "$(gem list -i \"^geminabox$\")" == "false" ]];then
   gem install geminabox
 fi
 
-gem inabox "pkg/$GEMSPEC_NAME-$VERSION-java.gem"
+gem inabox "pkg/$GEMSET_NAME-$VERSION-java.gem"
 
 rm Gemfile.lock
 
